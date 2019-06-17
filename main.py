@@ -7,6 +7,8 @@ import warnings
 warnings.filterwarnings('ignore')
 ## Ignore warning
 import os
+from sklearn.ensemble import RandomForestRegressor
+
 
 print(os.listdir("./input/"))
 print(os.listdir("./output"))
@@ -194,6 +196,7 @@ plt.xlabel("Age", fontsize = 15)
 plt.ylabel('Frequency', fontsize = 15)
 # fig.show()
 
+
 pal = {1:"seagreen", 0:"gray"}
 g = sns.FacetGrid(train,size=4, col="Sex", row="Survived", margin_titles=True, hue="Survived",
                   palette=pal)
@@ -201,6 +204,8 @@ g = g.map(plt.hist, "Age", edgecolor = 'white')
 g.fig.suptitle("Survived by Sex and Age", size = 15)
 plt.subplots_adjust(top=0.90)
 # plt.show()
+
+
 g = sns.FacetGrid(train,size=4, col="Sex", row="Embarked", margin_titles=True, hue="Survived",
                   palette = pal
                   )
@@ -218,7 +223,7 @@ plt.subplots_adjust(top=0.85)
 #  dropping the three outliers where Fare is over $500
 train = train[train.Fare < 500]
 # factor plot
-sns.factorplot(x = "Parch", y = "Survived", data = train,kind = "point",size = 8)
+
 plt.title("Factorplot of Parents/Children survived", fontsize = 25)
 plt.subplots_adjust(top=0.85)
 
@@ -231,6 +236,9 @@ print(train.describe())
 print(train.describe(include =['O']))
 train.loc[train['Sex'] == 'male', 'Sex'] = 1
 train.loc[train['Sex'] == 'female', 'Sex'] = 0
+test.loc[test['Sex'] == 'male', 'Sex'] = 1
+test.loc[test['Sex'] == 'female', 'Sex'] = 0
+# 二值化处理性别，pandas的corr计算只会统计数值类型,将测试集合和训练集合均修改
 print(train.sample(5))
 print(pd.DataFrame(abs(train.corr()['Survived']).sort_values(ascending=False)))
 print("*"*40)
@@ -239,7 +247,7 @@ print(corr.Survived.sort_values(ascending=False))
 
 # Generate a mask for the upper triangle (taken from seaborn example gallery)
 mask = np.zeros_like(train.corr(), dtype=np.bool)
-#mask[np.triu_indices_from(mask)] = True
+# mask[np.triu_indices_from(mask)] = True
 
 plt.subplots(figsize=(10,8))
 sns.heatmap(train.corr(),
@@ -250,5 +258,226 @@ sns.heatmap(train.corr(),
             vmax = .9,
             square=True)
 plt.title("Correlations Among Features", y=1.03,fontsize=20)
+# plt.show()
+
+# feature engineering
+# Creating a new colomn with a
+train['name_length'] = [len(i) for i in train.Name]
+test['name_length'] = [len(i) for i in test.Name]
+
+
+def name_length_group(size):
+    a = ''
+    if (size <=20):
+        a = 'short'
+    elif (size <=35):
+        a = 'medium'
+    elif (size <=45):
+        a = 'good'
+    else:
+        a = 'long'
+    return a
+
+
+train['nLength_group'] = train['name_length'].map(name_length_group)
+test['nLength_group'] = test['name_length'].map(name_length_group)
+
+print(train.sample(1))
+print(test.sample(1))
+# name length over
+
+# get the title from the name
+train["title"] = [i.split('.')[0] for i in train.Name]
+train["title"] = [i.split(',')[1] for i in train.title]
+test["title"] = [i.split('.')[0] for i in test.Name]
+test["title"]= [i.split(',')[1] for i in test.title]
+
+# train Data
+train["title"] = [i.replace('Ms', 'Miss') for i in train.title]
+train["title"] = [i.replace('Mlle', 'Miss') for i in train.title]
+train["title"] = [i.replace('Mme', 'Mrs') for i in train.title]
+train["title"] = [i.replace('Dr', 'rare') for i in train.title]
+train["title"] = [i.replace('Col', 'rare') for i in train.title]
+train["title"] = [i.replace('Major', 'rare') for i in train.title]
+train["title"] = [i.replace('Don', 'rare') for i in train.title]
+train["title"] = [i.replace('Jonkheer', 'rare') for i in train.title]
+train["title"] = [i.replace('Sir', 'rare') for i in train.title]
+train["title"] = [i.replace('Lady', 'rare') for i in train.title]
+train["title"] = [i.replace('Capt', 'rare') for i in train.title]
+train["title"] = [i.replace('the Countess', 'rare') for i in train.title]
+train["title"] = [i.replace('Rev', 'rare') for i in train.title]
+
+
+# test data
+test['title'] = [i.replace('Ms', 'Miss') for i in test.title]
+test['title'] = [i.replace('Dr', 'rare') for i in test.title]
+test['title'] = [i.replace('Col', 'rare') for i in test.title]
+test['title'] = [i.replace('Dona', 'rare') for i in test.title]
+test['title'] = [i.replace('Rev', 'rare') for i in test.title]
+# title feature over
+
+## Family_size seems like a good feature to create
+train['family_size'] = train.SibSp + train.Parch+1
+test['family_size'] = test.SibSp + test.Parch+1
+
+
+def family_group(size):
+    a = ''
+    if (size <= 1):
+        a = 'loner'
+    elif (size <= 4):
+        a = 'small'
+    else:
+        a = 'large'
+    return a
+
+
+train['family_group'] = train['family_size'].map(family_group)
+test['family_group'] = test['family_size'].map(family_group)
+
+train['is_alone'] = [1 if i<2 else 0 for i in train.family_size]
+test['is_alone'] = [1 if i<2 else 0 for i in test.family_size]
+
+print(train.Ticket.value_counts().sample(10))
+# drop the ticket feature
+train.drop(['Ticket'], axis=1, inplace=True)
+test.drop(['Ticket'], axis=1, inplace=True)
+
+# fare feature
+# Calculating fare based on family size.
+train['calculated_fare'] = train.Fare/train.family_size
+test['calculated_fare'] = test.Fare/test.family_size
+
+
+def fare_group(fare):
+    a= ''
+    if fare <= 4:
+        a = 'Very_low'
+    elif fare <= 10:
+        a = 'low'
+    elif fare <= 20:
+        a = 'mid'
+    elif fare <= 45:
+        a = 'high'
+    else:
+        a = "very_high"
+    return a
+
+
+train['fare_group'] = train['calculated_fare'].map(fare_group)
+test['fare_group'] = test['calculated_fare'].map(fare_group)
+# fare feature
+
+train.drop(['PassengerId'], axis=1, inplace=True)
+test.drop(['PassengerId'], axis=1, inplace=True)
+
+
+train = pd.get_dummies(train, columns=['title',"Pclass", 'Cabin','Embarked','nLength_group', 'family_group', 'fare_group'], drop_first=False)
+test = pd.get_dummies(test, columns=['title',"Pclass",'Cabin','Embarked','nLength_group', 'family_group', 'fare_group'], drop_first=False)
+train.drop(['family_size','Name', 'Fare','name_length'], axis=1, inplace=True)
+test.drop(['Name','family_size',"Fare",'name_length'], axis=1, inplace=True)
+
+
+# age group
+# rearranging the columns so that I can easily use the dataframe to predict the missing age values.
+train = pd.concat([train[["Survived", "Age", "Sex","SibSp","Parch"]], train.loc[:,"is_alone":]], axis=1)
+test = pd.concat([test[["Age", "Sex"]], test.loc[:,"SibSp":]], axis=1)
+# print(train.sample(5))
+# print(test.sample(5))
+
+
+# writing a function that takes a dataframe with missing values and outputs it by filling the missing values.
+def completing_age(df):
+    # getting all the features except survived
+    age_df = df.loc[:, "Age":]
+
+    temp_train = age_df.loc[age_df.Age.notnull()]  ## df with age values
+    temp_test = age_df.loc[age_df.Age.isnull()]  ## df without age values
+
+    y = temp_train.Age.values  ## setting target variables(age) in y
+    x = temp_train.loc[:, "Sex":].values
+
+    rfr = RandomForestRegressor(n_estimators=1500, n_jobs=-1)
+    rfr.fit(x, y)
+
+    predicted_age = rfr.predict(temp_test.loc[:, "Sex":])
+
+    df.loc[df.Age.isnull(), "Age"] = predicted_age
+
+    return df
+
+
+# Implementing the completing_age function in both train and test dataset.
+completing_age(train)
+completing_age(test)
+
+print(train.sample(5))
+print(test.sample(5))
+# Let's look at the his
+plt.subplots(figsize = (22,10),)
+sns.distplot(train.Age, bins = 100, kde = True, rug = False, norm_hist=False)
 plt.show()
+# print(train[train.Age.isnull()])
+# The output is Empty dataframe
+
+
+# create bins for age
+def age_group_fun(age):
+    a = ''
+    if age <= 1:
+        a = 'infant'
+    elif age <= 4:
+        a = 'toddler'
+    elif age <= 13:
+        a = 'child'
+    elif age <= 18:
+        a = 'teenager'
+    elif age <= 35:
+        a = 'Young_Adult'
+    elif age <= 45:
+        a = 'adult'
+    elif age <= 55:
+        a = 'middle_aged'
+    elif age <= 65:
+        a = 'senior_citizen'
+    else:
+        a = 'old'
+    return a
+
+
+# Applying "age_group_fun" function to the "Age" column.
+train['age_group'] = train['Age'].map(age_group_fun)
+test['age_group'] = test['Age'].map(age_group_fun)
+
+# Creating dummies for "age_group" feature.
+train = pd.get_dummies(train, columns=['age_group'], drop_first=True)
+test = pd.get_dummies(test, columns=['age_group'], drop_first=True)
+
+train.drop('Age', axis=1, inplace=True)
+test.drop('Age', axis=1, inplace=True)
+
+
+# separating our independent and dependent variable
+X = train.drop(['Survived'], axis=1)
+y = train["Survived"]
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y,test_size = .33, random_state=0)
+
+headers = X_train.columns
+
+print(X_train.head())
+# Feature Scaling
+## We will be using standardscaler to transform
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+
+# transforming "train_x"
+X_train = sc.fit_transform(X_train)
+# transforming "test_x"
+X_test = sc.transform(X_test)
+# transforming "The testset"
+test = sc.transform(test)
+
+print(pd.DataFrame(X_train, columns=headers).head())
 
