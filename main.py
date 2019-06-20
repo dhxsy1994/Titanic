@@ -8,6 +8,7 @@ warnings.filterwarnings('ignore')
 ## Ignore warning
 import os
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.utils.multiclass import unique_labels
 
 
 print(os.listdir("./input/"))
@@ -20,7 +21,7 @@ test = pd.read_csv("./input/test.csv")
 print(pd.DataFrame(abs(train.corr()['Survived']).sort_values(ascending=False)))
 print(train.sample(5))
 print(test.sample(5))
-
+passengerid = test.PassengerId
 print(train.info())
 print("*" * 40)
 print(test.info())
@@ -411,12 +412,13 @@ def completing_age(df):
 completing_age(train)
 completing_age(test)
 
-print(train.sample(5))
-print(test.sample(5))
+# print(train.sample(5))
+# print(test.sample(5))
 # Let's look at the his
 plt.subplots(figsize = (22,10),)
 sns.distplot(train.Age, bins = 100, kde = True, rug = False, norm_hist=False)
-plt.show()
+# plt.show()
+
 # print(train[train.Age.isnull()])
 # The output is Empty dataframe
 
@@ -453,10 +455,10 @@ test['age_group'] = test['Age'].map(age_group_fun)
 train = pd.get_dummies(train, columns=['age_group'], drop_first=True)
 test = pd.get_dummies(test, columns=['age_group'], drop_first=True)
 
-train.drop('Age', axis=1, inplace=True)
-test.drop('Age', axis=1, inplace=True)
+# train.drop('Age', axis=1, inplace=True)
+# test.drop('Age', axis=1, inplace=True)
 
-
+# pre modeling
 # separating our independent and dependent variable
 X = train.drop(['Survived'], axis=1)
 y = train["Survived"]
@@ -481,3 +483,203 @@ test = sc.transform(test)
 
 print(pd.DataFrame(X_train, columns=headers).head())
 
+
+# modeling the data
+
+train.calculated_fare = train.calculated_fare.astype(float)
+plt.subplots(figsize = (12,10))
+plt.scatter(train.Age, train.Survived);
+plt.xlabel("Age")
+plt.ylabel('Survival Status')
+# plt.show()
+
+
+# import LogisticRegression model in python.
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import mean_absolute_error, accuracy_score
+
+## call on the model object
+logreg = LogisticRegression(solver='liblinear')
+
+## fit the model with "train_x" and "train_y"
+logreg.fit(X_train,y_train)
+
+## Once the model is trained we want to find out how well the model is performing, so we test the model.
+## we use "test_x" portion of the data(this data was not used to fit the model) to predict model outcome.
+y_pred = logreg.predict(X_test)
+
+## Once predicted we save that outcome in "y_pred" variable.
+## Then we compare the predicted value( "y_pred") and actual value("test_y") to see how well our model is performing.
+
+
+print("Score is: {}".format(round(accuracy_score(y_pred, y_test), 4)))
+
+
+
+from sklearn.metrics import confusion_matrix
+confusion_matrix(y_test, y_pred)
+
+[unique_labels(y_test, y_pred)]
+
+
+def plot_confusion_matrix(y_true, y_pred, classes,
+                          normalize=False,
+                          title=None,
+                          cmap=plt.cm.Blues):
+    if not title:
+        if normalize:
+            title = 'Normalized confusion matrix'
+        else:
+            title = 'Confusion matrix, without normalization'
+
+        # Compute confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+    # Only use the labels that appear in the data
+    classes = classes[unique_labels(y_true, y_pred)]
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm)
+
+    fig, ax = plt.subplots()
+    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    ax.figure.colorbar(im, ax=ax)
+    # We want to show all ticks...
+    ax.set(xticks=np.arange(cm.shape[1]),
+           yticks=np.arange(cm.shape[0]),
+           # ... and label them with the respective list entries
+           xticklabels=classes, yticklabels=classes,
+           title=title,
+           ylabel='True label',
+           xlabel='Predicted label')
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Loop over data dimensions and create text annotations.
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            ax.text(j, i, format(cm[i, j], fmt),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    fig.tight_layout()
+    return ax
+
+
+np.set_printoptions(precision=2)
+
+class_names = np.array(['not_survived', 'survived'])
+
+# Plot non-normalized confusion matrix
+plot_confusion_matrix(y_test, y_pred, classes=class_names,
+                      title='Confusion matrix, without normalization')
+
+# Plot normalized confusion matrix
+plot_confusion_matrix(y_test, y_pred, classes=class_names, normalize=True,
+                      title='Normalized confusion matrix')
+
+# plt.show()
+
+from sklearn.metrics import classification_report
+print(classification_report(y_test, y_pred))
+
+# ROC
+from sklearn.metrics import roc_curve, auc
+#plt.style.use('seaborn-pastel')
+y_score = logreg.decision_function(X_test)
+
+FPR, TPR, _ = roc_curve(y_test, y_score)
+ROC_AUC = auc(FPR, TPR)
+print (ROC_AUC)
+
+plt.figure(figsize =[11,9])
+plt.plot(FPR, TPR, label= 'ROC curve(area = %0.2f)'%ROC_AUC, linewidth= 4)
+plt.plot([0,1],[0,1], 'k--', linewidth = 4)
+plt.xlim([0.0,1.0])
+plt.ylim([0.0,1.05])
+plt.xlabel('False Positive Rate', fontsize = 18)
+plt.ylabel('True Positive Rate', fontsize = 18)
+plt.title('ROC for Titanic survivors', fontsize= 18)
+# plt.show()
+# recall
+from sklearn.metrics import precision_recall_curve
+
+y_score = logreg.decision_function(X_test)
+
+precision, recall, _ = precision_recall_curve(y_test, y_score)
+PR_AUC = auc(recall, precision)
+
+plt.figure(figsize=[11,9])
+plt.plot(recall, precision, label='PR curve (area = %0.2f)' % PR_AUC, linewidth=4)
+plt.xlabel('Recall', fontsize=18)
+plt.ylabel('Precision', fontsize=18)
+plt.title('Precision Recall Curve for Titanic survivors', fontsize=18)
+plt.legend(loc="lower right")
+# plt.show()
+
+# Using StratifiedShuffleSplit
+# We can use KFold, StratifiedShuffleSplit, StratiriedKFold or ShuffleSplit, They are all close cousins. look at sklearn userguide for more info.
+from sklearn.model_selection import StratifiedShuffleSplit, cross_val_score
+cv = StratifiedShuffleSplit(n_splits = 10, test_size = .25, random_state = 0 ) # run model 10x with 60/30 split intentionally leaving out 10%
+# Using standard scale for the whole dataset.
+
+# saving the feature names for decision tree display
+column_names = X.columns
+
+X = sc.fit_transform(X)
+accuracies = cross_val_score(LogisticRegression(solver='liblinear'), X,y, cv  = cv)
+print ("Cross-Validation accuracy scores:{}".format(accuracies))
+print ("Mean Cross-Validation accuracy score: {}".format(round(accuracies.mean(),5)))
+
+
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+
+# if __name__=='__main__':
+
+# C_vals is the alpla value of lasso and ridge regression(as alpha increases the model complexity decreases,)
+# remember effective alpha scores are 0<alpha<infinity
+C_vals = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 16.5, 17, 17.5, 18]
+# Choosing penalties(Lasso(l1) or Ridge(l2))
+penalties = ['l1', 'l2']
+# Choose a cross validation strategy.
+cv = StratifiedShuffleSplit(n_splits=10, test_size=.25)
+
+# setting param for param_grid in GridSearchCV.
+param = {'penalty': penalties, 'C': C_vals}
+
+logreg = LogisticRegression(solver='liblinear')
+# Calling on GridSearchCV object.
+grid = GridSearchCV(estimator=LogisticRegression(),
+                    param_grid=param,
+                    scoring='accuracy',
+                    n_jobs=1,
+                    cv=cv
+                    )
+# Fitting the model
+grid.fit(X, y)
+
+## Getting the best of everything.
+    # print(grid.best_score_)
+    # print(grid.best_params_)
+    # print(grid.best_estimator_)
+
+### Using the best parameters from the grid-search.
+logreg_grid = grid.best_estimator_
+    # print(logreg_grid.score(X, y))
+
+
+test_pre = logreg_grid.predict(test)
+submission = pd.DataFrame({
+        "PassengerId": passengerid,
+        "Survived": test_pre })
+
+submission.PassengerId = submission.PassengerId.astype(int)
+submission.Survived = submission.Survived.astype(int)
+
+submission.to_csv("titanic1_submission.csv", index=False)
