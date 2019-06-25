@@ -317,7 +317,7 @@ test['title'] = [i.replace('Dona', 'rare') for i in test.title]
 test['title'] = [i.replace('Rev', 'rare') for i in test.title]
 # title feature over
 
-## Family_size seems like a good feature to create
+# Family_size seems like a good feature to create
 train['family_size'] = train.SibSp + train.Parch+1
 test['family_size'] = test.SibSp + test.Parch+1
 
@@ -665,19 +665,63 @@ grid = GridSearchCV(estimator=LogisticRegression(),
 grid.fit(X, y)
 
 ## Getting the best of everything.
-    # print(grid.best_score_)
-    # print(grid.best_params_)
-    # print(grid.best_estimator_)
-
+print(grid.best_score_)
+print(grid.best_params_)
+print(grid.best_estimator_)
 ### Using the best parameters from the grid-search.
 logreg_grid = grid.best_estimator_
-    # print(logreg_grid.score(X, y))
+print("logred score = ", logreg_grid.score(X,y))
+
+print("KNN algo")
+# Importing the model.
+from sklearn.neighbors import KNeighborsClassifier
+# calling on the model oject.
+knn = KNeighborsClassifier(metric='minkowski', p=2)
+# knn classifier works by doing euclidian distance
 
 
-test_pre = logreg_grid.predict(test)
+# doing 10 fold staratified-shuffle-split cross validation
+cv = StratifiedShuffleSplit(n_splits=10, test_size=.25, random_state=2)
+
+accuracies = cross_val_score(knn, X,y, cv = cv, scoring='accuracy')
+print("Cross-Validation accuracy scores:{}".format(accuracies))
+print("Mean Cross-Validation accuracy score: {}".format(round(accuracies.mean(), 3)))
+
+## Search for an optimal value of k for KNN.
+from sklearn.model_selection import RandomizedSearchCV
+## trying out multiple values for k
+k_range = range(1, 31)
+##
+weights_options=['uniform', 'distance']
+#
+param = {'n_neighbors':k_range, 'weights':weights_options}
+# Using startifiedShufflesplit.
+cv = StratifiedShuffleSplit(n_splits=10, test_size=.30)
+# estimator = knn, param_grid = param, n_jobs = -1 to instruct scikit learn to use all available processors.
+# for RandomizedSearchCV,
+grid = RandomizedSearchCV(KNeighborsClassifier(), param, cv=cv, verbose=False, n_jobs=1, n_iter=40)
+# Fitting the model.
+grid.fit(X, y)
+print (grid.best_score_)
+print (grid.best_params_)
+print(grid.best_estimator_)
+### Using the best parameters from the grid-search.
+knn_ran_grid = grid.best_estimator_
+print("knn_ran socre=",knn_ran_grid.score(X, y))
+
+all_models = [logreg_grid,
+              knn_ran_grid,]
+c = {}
+for i in all_models:
+    a = i.predict(X)
+    b = accuracy_score(a,y)
+    c[i] = b
+
+test_predict = (max(c,key=c.get)).predict(test)
+
 submission = pd.DataFrame({
         "PassengerId": passengerid,
-        "Survived": test_pre })
+        "Survived": test_predict})
 
 submission.PassengerId = submission.PassengerId.astype(int)
 submission.Survived = submission.Survived.astype(int)
